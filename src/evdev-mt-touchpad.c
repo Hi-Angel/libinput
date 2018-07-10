@@ -230,7 +230,14 @@ tp_get_touch(struct tp_dispatch *tp, unsigned int slot)
 	return &tp->touches[slot];
 }
 
-static inline unsigned int
+static inline void
+tp_rm_touch(struct tp_dispatch *tp, unsigned int slot)
+{
+	assert(slot < tp->ntouches);
+	tp->touches[slot] = 0;
+}
+
+static inline int
 tp_fake_finger_count(struct tp_dispatch *tp)
 {
 	/* Only one of BTN_TOOL_DOUBLETAP/TRIPLETAP/... may be set at any
@@ -350,7 +357,6 @@ tp_maybe_end_touch(struct tp_dispatch *tp,
 		   uint64_t time)
 {
 	switch (t->state) {
-	case TOUCH_NONE:
 	case TOUCH_MAYBE_END:
 		return;
 	case TOUCH_END:
@@ -369,7 +375,7 @@ tp_maybe_end_touch(struct tp_dispatch *tp,
 		tp->nfingers_down--;
 		t->state = TOUCH_MAYBE_END;
 	} else {
-		t->state = TOUCH_NONE;
+		tp_rm_touch(tp, t->index);
 	}
 
 	t->dirty = true;
@@ -1173,9 +1179,6 @@ tp_unhover_pressure(struct tp_dispatch *tp, uint64_t time)
 	for (i = 0; i < (int)tp->num_slots; i++) {
 		t = tp_get_touch(tp, i);
 
-		if (t->state == TOUCH_NONE)
-			continue;
-
 		if (t->dirty) {
 			if (t->state == TOUCH_HOVERING) {
 				if (t->pressure >= tp->pressure.high) {
@@ -1234,7 +1237,6 @@ tp_unhover_pressure(struct tp_dispatch *tp, uint64_t time)
 			t = tp_get_touch(tp, i);
 
 			if (t->state == TOUCH_HOVERING ||
-			    t->state == TOUCH_NONE ||
 			    t->state == TOUCH_MAYBE_END)
 				continue;
 
@@ -1260,9 +1262,6 @@ tp_unhover_size(struct tp_dispatch *tp, uint64_t time)
 
 	for (i = 0; i < (int)tp->num_slots; i++) {
 		t = tp_get_touch(tp, i);
-
-		if (t->state == TOUCH_NONE)
-			continue;
 
 		if (!t->dirty)
 			continue;
@@ -1332,8 +1331,7 @@ tp_unhover_fake_touches(struct tp_dispatch *tp, uint64_t time)
 		for (i = tp->ntouches - 1; i >= 0; i--) {
 			t = tp_get_touch(tp, i);
 
-			if (t->state == TOUCH_HOVERING ||
-			    t->state == TOUCH_NONE)
+			if (t->state == TOUCH_HOVERING)
 				continue;
 
 			tp_maybe_end_touch(tp, t, time);
@@ -1374,8 +1372,7 @@ tp_position_fake_touches(struct tp_dispatch *tp)
 	 */
 	for (i = 0; i < tp->num_slots; i++) {
 		t = tp_get_touch(tp, i);
-		if (t->state == TOUCH_END ||
-		    t->state == TOUCH_NONE)
+		if (t->state == TOUCH_END)
 			continue;
 
 		if (topmost == NULL || t->point.y < topmost->point.y)
@@ -1391,8 +1388,6 @@ tp_position_fake_touches(struct tp_dispatch *tp)
 	start = tp->has_mt ? tp->num_slots : 1;
 	for (i = start; i < tp->ntouches; i++) {
 		t = tp_get_touch(tp, i);
-		if (t->state == TOUCH_NONE)
-			continue;
 
 		t->point = topmost->point;
 		t->pressure = topmost->pressure;
@@ -1538,8 +1533,6 @@ tp_process_state(struct tp_dispatch *tp, uint64_t time)
 	want_motion_reset = tp_need_motion_history_reset(tp);
 
 	tp_for_each_touch(tp, t) {
-		if (t->state == TOUCH_NONE)
-			continue;
 
 		if (want_motion_reset) {
 			tp_motion_history_reset(t);
@@ -1644,7 +1637,7 @@ tp_post_process_state(struct tp_dispatch *tp, uint64_t time)
 
 		if (t->state == TOUCH_END) {
 			if (t->has_ended)
-				t->state = TOUCH_NONE;
+				tp_rm_touch(tp, t->index);
 			else
 				t->state = TOUCH_HOVERING;
 		} else if (t->state == TOUCH_BEGIN) {

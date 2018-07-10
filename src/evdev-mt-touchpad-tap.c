@@ -974,7 +974,7 @@ tp_tap_handle_state(struct tp_dispatch *tp, uint64_t time)
 		tp_tap_handle_event(tp, NULL, TAP_EVENT_BUTTON, time);
 
 	tp_for_each_touch(tp, t) {
-		if (!t->dirty || t->state == TOUCH_NONE)
+		if (!t->dirty)
 			continue;
 
 		if (tp->buttons.is_clickpad &&
@@ -1111,8 +1111,7 @@ tp_tap_handle_timeout(uint64_t time, void *data)
 	tp_tap_handle_event(tp, NULL, TAP_EVENT_TIMEOUT, time);
 
 	tp_for_each_touch(tp, t) {
-		if (t->state == TOUCH_NONE ||
-		    t->tap.state == TAP_TOUCH_STATE_IDLE)
+		if (t->tap.state == TAP_TOUCH_STATE_IDLE)
 			continue;
 
 		t->tap.state = TAP_TOUCH_STATE_DEAD;
@@ -1135,9 +1134,6 @@ tp_tap_enabled_update(struct tp_dispatch *tp, bool suspended, bool enabled, uint
 
 		/* On resume, all touches are considered palms */
 		tp_for_each_touch(tp, t) {
-			if (t->state == TOUCH_NONE)
-				continue;
-
 			t->tap.is_palm = true;
 			t->tap.state = TAP_TOUCH_STATE_DEAD;
 		}
@@ -1367,9 +1363,6 @@ tp_release_all_taps(struct tp_dispatch *tp, uint64_t now)
 
 	/* To neutralize all current touches, we make them all palms */
 	tp_for_each_touch(tp, t) {
-		if (t->state == TOUCH_NONE)
-			continue;
-
 		if (t->tap.is_palm)
 			continue;
 

@@ -357,7 +357,6 @@ tp_edge_scroll_handle_state(struct tp_dispatch *tp, uint64_t time)
 			continue;
 
 		switch (t->state) {
-		case TOUCH_NONE:
 		case TOUCH_HOVERING:
 			break;
 		case TOUCH_BEGIN:
